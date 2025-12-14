@@ -1,0 +1,37 @@
+# Backend Dockerfile
+# Multi-stage build: Python backend + C engine
+
+# Stage 1: Build C engine
+FROM gcc:13 AS c-builder
+WORKDIR /build
+COPY engine/ .
+RUN make clean && make
+
+# Stage 2: Python backend
+FROM python:3.11-slim
+
+WORKDIR /app
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    libpq5 \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy C engine binary
+COPY --from=c-builder /build/scheduler /app/engine/scheduler
+
+# Install Python dependencies
+COPY backend/requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Copy backend code
+COPY backend/ .
+
+# Create uploads directory
+RUN mkdir -p /app/uploads
+
+# Expose port
+EXPOSE 8000
+
+# Run with uvicorn
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]

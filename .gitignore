@@ -1,0 +1,45 @@
+# Dependencies
+node_modules/
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# Build outputs
+.next/
+out/
+build/
+dist/
+*.exe
+*.o
+
+# Data files
+*.dat
+uploads/
+backups/
+
+# Environment
+.env
+.env.local
+.env*.local
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+npm-debug.log*
+
+# Docker volumes
+postgres_data/
+copilot_data/
+
+# Local dev
+*.local
