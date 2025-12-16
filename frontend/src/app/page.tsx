@@ -4,6 +4,15 @@ import { useEffect, useState } from 'react'
 import Dashboard from '@/components/Dashboard'
 import AICommandCenter from '@/components/AICommandCenter'
 import SystemBadge from '@/components/SystemBadge'
+import StudyTimer from '@/components/StudyTimer'
+import TodayDashboard from '@/components/TodayDashboard'
+import TimelineView from '@/components/TimelineView'
+import ScheduleInput from '@/components/ScheduleInput'
+import LabReportTracker from '@/components/LabReportTracker'
+import StudyAnalytics from '@/components/StudyAnalytics'
+import GoalTracker from '@/components/GoalTracker'
+
+type TabType = 'today' | 'timeline' | 'tasks' | 'labs' | 'analytics' | 'goals'
 
 interface Briefing {
     greeting: string
@@ -18,6 +27,7 @@ interface Briefing {
 export default function Home() {
     const [briefing, setBriefing] = useState<Briefing | null>(null)
     const [loading, setLoading] = useState(true)
+    const [activeTab, setActiveTab] = useState<TabType>('today')
 
     useEffect(() => {
         fetchBriefing()
@@ -34,6 +44,39 @@ export default function Home() {
             console.error('Failed to fetch briefing:', error)
         } finally {
             setLoading(false)
+        }
+    }
+
+    const tabs = [
+        { id: 'today' as TabType, label: 'Today', icon: '📊' },
+        { id: 'timeline' as TabType, label: 'Timeline', icon: '📅' },
+        { id: 'tasks' as TabType, label: 'Tasks', icon: '✅' },
+        { id: 'labs' as TabType, label: 'Labs', icon: '🧪' },
+        { id: 'analytics' as TabType, label: 'Analytics', icon: '📈' },
+        { id: 'goals' as TabType, label: 'Goals', icon: '🎯' },
+    ]
+
+    const renderTabContent = () => {
+        switch (activeTab) {
+            case 'today':
+                return <TodayDashboard />
+            case 'timeline':
+                return (
+                    <div className="space-y-6">
+                        <ScheduleInput onScheduleChange={() => {}} />
+                        <TimelineView />
+                    </div>
+                )
+            case 'tasks':
+                return <Dashboard />
+            case 'labs':
+                return <LabReportTracker />
+            case 'analytics':
+                return <StudyAnalytics />
+            case 'goals':
+                return <GoalTracker />
+            default:
+                return <TodayDashboard />
         }
     }
 
@@ -54,6 +97,9 @@ export default function Home() {
 
                     {briefing && (
                         <div className="flex items-center gap-6">
+                            {/* Study Timer */}
+                            <StudyTimer />
+
                             {/* Streak */}
                             <div className="flex items-center gap-2 px-4 py-2 rounded-lg bg-surface-light">
                                 <span className="text-2xl streak-fire">🔥</span>
@@ -77,13 +123,35 @@ export default function Home() {
                 </div>
             </header>
 
+            {/* Tab Navigation */}
+            <div className="bg-surface border-b border-white/10">
+                <div className="max-w-7xl mx-auto px-6">
+                    <div className="flex gap-1 overflow-x-auto py-2">
+                        {tabs.map(tab => (
+                            <button
+                                key={tab.id}
+                                onClick={() => setActiveTab(tab.id)}
+                                className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-colors whitespace-nowrap ${
+                                    activeTab === tab.id
+                                        ? 'bg-primary text-white'
+                                        : 'text-zinc-400 hover:text-white hover:bg-surface-light'
+                                }`}
+                            >
+                                <span>{tab.icon}</span>
+                                <span className="text-sm font-medium">{tab.label}</span>
+                            </button>
+                        ))}
+                    </div>
+                </div>
+            </div>
+
             {/* Main Content */}
             <div className="flex-1 max-w-7xl mx-auto w-full px-6 py-8">
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                    {/* Left: Dashboard */}
+                    {/* Left: Tab Content */}
                     <div className="lg:col-span-2 space-y-6">
-                        {/* Greeting */}
-                        {briefing && (
+                        {/* Greeting Card */}
+                        {briefing && activeTab === 'today' && (
                             <div className="glass rounded-2xl p-6 card-hover">
                                 <h2 className="text-2xl font-bold text-white mb-2">
                                     {briefing.greeting}
@@ -105,7 +173,7 @@ export default function Home() {
                             </div>
                         )}
 
-                        <Dashboard />
+                        {renderTabContent()}
                     </div>
 
                     {/* Right: AI Command Center */}

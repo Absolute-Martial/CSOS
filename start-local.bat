@@ -25,16 +25,38 @@ if %ERRORLEVEL% neq 0 (
     exit /b 1
 )
 
-echo [1/4] Starting PostgreSQL (via Docker)...
-docker ps -q -f name=eng-db >nul 2>nul
-if %ERRORLEVEL% neq 0 (
-    echo Starting new PostgreSQL container...
-    docker run -d --name eng-db -e POSTGRES_USER=postgres -e POSTGRES_PASSWORD=postgres -e POSTGRES_DB=engineering_os -p 5432:5432 -v "%~dp0database\init.sql:/docker-entrypoint-initdb.d/init.sql" postgres:16-alpine
+echo [1/4] Checking PostgreSQL...
+
+:: Check if container exists (running or stopped)
+docker ps -a -q -f name=engineering-os-db >nul 2>nul
+for /f %%i in ('docker ps -a -q -f name^=engineering-os-db') do set CONTAINER_EXISTS=%%i
+
+if defined CONTAINER_EXISTS (
+    :: Container exists, check if running
+    docker ps -q -f name=engineering-os-db >nul 2>nul
+    for /f %%i in ('docker ps -q -f name^=engineering-os-db') do set CONTAINER_RUNNING=%%i
+    
+    if defined CONTAINER_RUNNING (
+        echo PostgreSQL already running. Data preserved.
+    ) else (
+        echo Starting existing PostgreSQL container...
+        docker start engineering-os-db
+        echo PostgreSQL started. Data preserved.
+    )
 ) else (
-    echo PostgreSQL already running.
+    :: Container doesn't exist, create new one with persistent volume
+    echo Creating new PostgreSQL container with persistent volume...
+    docker run --name engineering-os-db -e POSTGRES_USER=postgres -e POSTGRES_PASSWORD=postgres -e POSTGRES_DB=engineering_os -p 5432:5432 -v engineering-os-data:/var/lib/postgresql/data -d postgres:16-alpine
+    
+    echo Waiting for PostgreSQL to start...
+    timeout /t 5 /nobreak >nul
+    
+    echo Initializing database schema...
+    cmd /c "docker exec -i engineering-os-db psql -U postgres -d engineering_os < database\init.sql"
+    echo Database initialized with schema.
 )
 
-timeout /t 3 /nobreak >nul
+timeout /t 2 /nobreak >nul
 
 echo.
 echo [2/4] Starting copilot-api (GitHub Copilot Proxy)...
@@ -60,6 +82,9 @@ echo.
 echo   Frontend:  http://localhost:3000
 echo   Backend:   http://localhost:8000
 echo   API Docs:  http://localhost:8000/docs
+echo.
+echo   Your data is stored in Docker volume: engineering-os-data
+echo   Data persists across restarts!
 echo.
 echo   Press any key to open the dashboard...
 pause >nul

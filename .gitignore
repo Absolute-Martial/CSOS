@@ -4,7 +4,7 @@ __pycache__/
 *.pyc
 .venv/
 venv/
-
+.claude/
 # Build outputs
 .next/
 out/
@@ -43,3 +43,9 @@ copilot_data/
 
 # Local dev
 *.local
+
+# External tools and test files
+copilot-api-0.7.0/
+studybuddy/
+nul
+backend/test_pydantic.py

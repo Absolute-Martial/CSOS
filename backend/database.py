@@ -1,14 +1,13 @@
 """
 Personal Engineering OS - Database Connection
-Async PostgreSQL with connection pooling
+Async PostgreSQL with asyncpg
 """
 
 import os
-from contextlib import asynccontextmanager
-from typing import AsyncGenerator, Any, Optional
+import json
+from typing import Any, Optional, List
 
 import asyncpg
-from asyncpg import Pool, Connection
 
 
 # Database configuration
@@ -22,50 +21,39 @@ class Database:
     """Async database connection manager."""
     
     def __init__(self):
-        self.pool: Optional[Pool] = None
+        self._pool = None
     
     async def connect(self):
         """Create connection pool."""
-        self.pool = await asyncpg.create_pool(
-            DATABASE_URL,
-            min_size=2,
-            max_size=10,
-            command_timeout=60
-        )
-        print(f"✓ Database connected: {DATABASE_URL.split('@')[1]}")
+        self._pool = await asyncpg.create_pool(DATABASE_URL, min_size=2, max_size=10)
+        print(f"✓ Database connected")
     
     async def disconnect(self):
         """Close connection pool."""
-        if self.pool:
-            await self.pool.close()
+        if self._pool:
+            await self._pool.close()
             print("✓ Database disconnected")
     
-    @asynccontextmanager
-    async def connection(self) -> AsyncGenerator[Connection, None]:
-        """Get a connection from the pool."""
-        async with self.pool.acquire() as conn:
-            yield conn
-    
-    async def fetch(self, query: str, *args) -> list[dict]:
+    async def fetch(self, query: str, *args) -> List[dict]:
         """Fetch multiple rows."""
-        async with self.connection() as conn:
+        async with self._pool.acquire() as conn:
             rows = await conn.fetch(query, *args)
             return [dict(row) for row in rows]
     
     async def fetch_one(self, query: str, *args) -> Optional[dict]:
         """Fetch single row."""
-        async with self.connection() as conn:
+        async with self._pool.acquire() as conn:
             row = await conn.fetchrow(query, *args)
             return dict(row) if row else None
     
     async def execute(self, query: str, *args) -> str:
         """Execute query (INSERT, UPDATE, DELETE)."""
-        async with self.connection() as conn:
+        async with self._pool.acquire() as conn:
             return await conn.execute(query, *args)
     
     async def execute_returning(self, query: str, *args) -> Optional[dict]:
         """Execute and return the affected row."""
-        async with self.connection() as conn:
+        async with self._pool.acquire() as conn:
             row = await conn.fetchrow(query, *args)
             return dict(row) if row else None
 
@@ -78,7 +66,7 @@ db = Database()
 # SUBJECT QUERIES
 # ============================================
 
-async def get_all_subjects() -> list[dict]:
+async def get_all_subjects() -> List[dict]:
     return await db.fetch("SELECT * FROM subjects ORDER BY credits DESC, code")
 
 
@@ -102,7 +90,7 @@ async def create_subject(code: str, name: str, credits: int, type: str, color: s
 # CHAPTER QUERIES
 # ============================================
 
-async def get_chapters_by_subject(subject_id: int) -> list[dict]:
+async def get_chapters_by_subject(subject_id: int) -> List[dict]:
     return await db.fetch(
         """SELECT c.*, cp.reading_status, cp.assignment_status, cp.mastery_level
            FROM chapters c
@@ -125,28 +113,25 @@ async def get_chapter(chapter_id: int) -> Optional[dict]:
 
 
 async def create_chapter(subject_id: int, number: int, title: str, folder_path: str) -> dict:
-    # Create chapter
     chapter = await db.execute_returning(
         """INSERT INTO chapters (subject_id, number, title, folder_path)
            VALUES ($1, $2, $3, $4) RETURNING *""",
         subject_id, number, title, folder_path
     )
-    
-    # Create progress entry
-    await db.execute(
-        "INSERT INTO chapter_progress (chapter_id) VALUES ($1)",
-        chapter['id']
-    )
-    
+    await db.execute("INSERT INTO chapter_progress (chapter_id) VALUES ($1)", chapter['id'])
     return chapter
 
 
 async def update_chapter_progress(chapter_id: int, **updates) -> dict:
-    set_clause = ", ".join(f"{k} = ${i+2}" for i, k in enumerate(updates.keys()))
-    values = [chapter_id] + list(updates.values())
-    
+    set_parts = []
+    values = []
+    for i, (k, v) in enumerate(updates.items(), 1):
+        set_parts.append(f"{k} = ${i}")
+        values.append(v)
+    values.append(chapter_id)
+    set_clause = ", ".join(set_parts)
     return await db.execute_returning(
-        f"UPDATE chapter_progress SET {set_clause}, updated_at = NOW() WHERE chapter_id = $1 RETURNING *",
+        f"UPDATE chapter_progress SET {set_clause}, updated_at = NOW() WHERE chapter_id = ${len(values)} RETURNING *",
         *values
     )
 
@@ -155,7 +140,7 @@ async def update_chapter_progress(chapter_id: int, **updates) -> dict:
 # TASK QUERIES
 # ============================================
 
-async def get_tasks_today() -> list[dict]:
+async def get_tasks_today() -> List[dict]:
     return await db.fetch(
         """SELECT t.*, s.code as subject_code, s.color
            FROM tasks t
@@ -178,11 +163,15 @@ async def create_task(data: dict) -> dict:
 
 
 async def update_task(task_id: int, **updates) -> dict:
-    set_clause = ", ".join(f"{k} = ${i+2}" for i, k in enumerate(updates.keys()))
-    values = [task_id] + list(updates.values())
-    
+    set_parts = []
+    values = []
+    for i, (k, v) in enumerate(updates.items(), 1):
+        set_parts.append(f"{k} = ${i}")
+        values.append(v)
+    values.append(task_id)
+    set_clause = ", ".join(set_parts)
     return await db.execute_returning(
-        f"UPDATE tasks SET {set_clause}, updated_at = NOW() WHERE id = $1 RETURNING *",
+        f"UPDATE tasks SET {set_clause}, updated_at = NOW() WHERE id = ${len(values)} RETURNING *",
         *values
     )
 
@@ -196,7 +185,7 @@ async def delete_task(task_id: int) -> bool:
 # LAB REPORT QUERIES
 # ============================================
 
-async def get_lab_reports(status: str = None) -> list[dict]:
+async def get_lab_reports(status: str = None) -> List[dict]:
     if status:
         return await db.fetch(
             """SELECT lr.*, s.code as subject_code, s.credits
@@ -226,7 +215,7 @@ async def create_lab_report(data: dict) -> dict:
 # REVISION QUERIES
 # ============================================
 
-async def get_pending_revisions() -> list[dict]:
+async def get_pending_revisions() -> List[dict]:
     return await db.fetch(
         """SELECT rs.*, c.number as chapter_number, c.title as chapter_title,
                   s.code as subject_code, s.credits as subject_credits, s.color
@@ -239,12 +228,25 @@ async def get_pending_revisions() -> list[dict]:
 
 
 async def complete_revision(revision_id: int, points: int = 15) -> dict:
-    return await db.execute_returning(
-        """UPDATE revision_schedule 
-           SET completed = true, completed_at = NOW(), points_earned = $2
-           WHERE id = $1 RETURNING *""",
-        revision_id, points
+    result = await db.execute_returning(
+        """UPDATE revision_schedule
+           SET completed = true, completed_at = NOW(), points_earned = $1
+           WHERE id = $2 RETURNING *""",
+        points, revision_id
     )
+
+    # Check for newly earned achievements after revision completion
+    earned_achievements = []
+    try:
+        from achievements import check_achievements_after_action
+        earned_achievements = await check_achievements_after_action("revision_complete")
+    except Exception:
+        pass  # Don't fail if achievement check fails
+
+    if result:
+        result['achievements_earned'] = earned_achievements
+
+    return result
 
 
 # ============================================
@@ -253,18 +255,14 @@ async def complete_revision(revision_id: int, points: int = 15) -> dict:
 
 async def get_streak() -> dict:
     streak = await db.fetch_one("SELECT * FROM user_streaks LIMIT 1")
-    
-    # Get next reward
     next_reward = await db.fetch_one(
         """SELECT * FROM rewards 
            WHERE unlocked = false 
            ORDER BY required_streak LIMIT 1"""
     )
-    
     if streak and next_reward:
         streak['next_reward'] = next_reward['name']
         streak['points_to_next'] = next_reward['required_streak'] - streak['current_streak']
-    
     return streak
 
 
@@ -281,7 +279,7 @@ async def add_points(points: int) -> dict:
 # AI MEMORY QUERIES
 # ============================================
 
-async def get_ai_memory() -> list[dict]:
+async def get_ai_memory() -> List[dict]:
     return await db.fetch("SELECT * FROM ai_memory ORDER BY category, key")
 
 
@@ -290,17 +288,15 @@ async def save_ai_memory(category: str, key: str, value: str) -> dict:
         """INSERT INTO ai_memory (category, key, value)
            VALUES ($1, $2, $3)
            ON CONFLICT (category, key) 
-           DO UPDATE SET value = $3, updated_at = NOW()
+           DO UPDATE SET value = $4, updated_at = NOW()
            RETURNING *""",
-        category, key, value
+        category, key, value, value
     )
 
 
-async def get_ai_guidelines(active_only: bool = True) -> list[dict]:
+async def get_ai_guidelines(active_only: bool = True) -> List[dict]:
     if active_only:
-        return await db.fetch(
-            "SELECT * FROM ai_guidelines WHERE active = true ORDER BY priority"
-        )
+        return await db.fetch("SELECT * FROM ai_guidelines WHERE active = true ORDER BY priority")
     return await db.fetch("SELECT * FROM ai_guidelines ORDER BY priority")
 
 
@@ -315,7 +311,7 @@ async def add_ai_guideline(rule: str, priority: int) -> dict:
 # NOTIFICATION QUERIES
 # ============================================
 
-async def get_unread_notifications() -> list[dict]:
+async def get_unread_notifications() -> List[dict]:
     return await db.fetch(
         """SELECT * FROM notifications 
            WHERE read = false AND dismissed = false
@@ -351,7 +347,7 @@ async def save_file_record(chapter_id: int, file_type: str, filename: str,
     )
 
 
-async def get_chapter_files(chapter_id: int) -> list[dict]:
+async def get_chapter_files(chapter_id: int) -> List[dict]:
     return await db.fetch(
         "SELECT * FROM chapter_files WHERE chapter_id = $1 ORDER BY uploaded_at DESC",
         chapter_id
@@ -363,13 +359,10 @@ async def get_chapter_files(chapter_id: int) -> list[dict]:
 # ============================================
 
 async def get_version() -> dict:
-    return await db.fetch_one(
-        "SELECT * FROM version_metadata ORDER BY deployed_at DESC LIMIT 1"
-    )
+    return await db.fetch_one("SELECT * FROM version_metadata ORDER BY deployed_at DESC LIMIT 1")
 
 
 async def log_system(level: str, message: str, context: dict = None) -> None:
-    import json
     await db.execute(
         "INSERT INTO system_logs (level, message, context) VALUES ($1, $2, $3)",
         level, message, json.dumps(context) if context else None

@@ -1,12 +1,11 @@
 """
-Personal Engineering OS - Pydantic Models
-MIT 6.100L aligned: abstraction, type safety
+Personal Engineering OS - Pydantic Models (v2 syntax)
 """
 
-from datetime import datetime, date
+from datetime import datetime
 from enum import Enum
 from typing import Optional, List, Any
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict
 
 
 # ============================================
@@ -56,11 +55,11 @@ class NotificationType(str, Enum):
 # ============================================
 
 class SubjectBase(BaseModel):
-    code: str = Field(..., pattern=r"^[A-Z]{4}[0-9]{3}$", example="MATH101")
+    code: str
     name: str
-    credits: int = Field(ge=1, le=6, default=3)
+    credits: int = 3
     type: SubjectType
-    color: str = Field(default="#6366f1", pattern=r"^#[0-9a-fA-F]{6}$")
+    color: str = "#6366f1"
 
 
 class SubjectCreate(SubjectBase):
@@ -68,11 +67,10 @@ class SubjectCreate(SubjectBase):
 
 
 class Subject(SubjectBase):
+    model_config = ConfigDict(from_attributes=True)
+    
     id: int
     created_at: datetime
-
-    class Config:
-        from_attributes = True
 
 
 # ============================================
@@ -80,9 +78,9 @@ class Subject(SubjectBase):
 # ============================================
 
 class ChapterBase(BaseModel):
-    number: int = Field(ge=1)
+    number: int
     title: str
-    total_pages: int = Field(default=0, ge=0)
+    total_pages: int = 0
 
 
 class ChapterCreate(ChapterBase):
@@ -92,21 +90,20 @@ class ChapterCreate(ChapterBase):
 class ChapterProgress(BaseModel):
     reading_status: ProgressStatus = ProgressStatus.NOT_STARTED
     assignment_status: AssignmentStatus = AssignmentStatus.LOCKED
-    mastery_level: int = Field(default=0, ge=0, le=100)
+    mastery_level: int = 0
     revision_count: int = 0
     last_revised_at: Optional[datetime] = None
     notes: Optional[str] = None
 
 
 class Chapter(ChapterBase):
+    model_config = ConfigDict(from_attributes=True)
+    
     id: int
     subject_id: int
-    folder_path: Optional[str]
+    folder_path: Optional[str] = None
     created_at: datetime
     progress: Optional[ChapterProgress] = None
-
-    class Config:
-        from_attributes = True
 
 
 # ============================================
@@ -117,8 +114,8 @@ class TaskBase(BaseModel):
     title: str
     description: Optional[str] = None
     subject_id: Optional[int] = None
-    priority: int = Field(default=5, ge=1, le=10)
-    duration_mins: int = Field(default=60, ge=5)
+    priority: int = 5
+    duration_mins: int = 60
     scheduled_start: Optional[datetime] = None
     scheduled_end: Optional[datetime] = None
     is_deep_work: bool = False
@@ -129,13 +126,12 @@ class TaskCreate(TaskBase):
 
 
 class Task(TaskBase):
+    model_config = ConfigDict(from_attributes=True)
+    
     id: int
     status: TaskStatus
     created_at: datetime
     updated_at: datetime
-
-    class Config:
-        from_attributes = True
 
 
 # ============================================
@@ -154,125 +150,20 @@ class LabReportCreate(LabReportBase):
 
 
 class LabReport(LabReportBase):
+    model_config = ConfigDict(from_attributes=True)
+    
     id: int
     status: TaskStatus
-    file_path: Optional[str]
+    file_path: Optional[str] = None
     created_at: datetime
-
-    class Config:
-        from_attributes = True
-
-
-# ============================================
-# REVISION MODELS
-# ============================================
-
-class RevisionSchedule(BaseModel):
-    id: int
-    chapter_id: int
-    revision_number: int
-    due_date: date
-    completed: bool
-    completed_at: Optional[datetime]
-    points_earned: int
-
-    class Config:
-        from_attributes = True
-
-
-class RevisionQueueItem(BaseModel):
-    revision_id: int
-    chapter_number: int
-    chapter_title: str
-    subject_code: str
-    subject_credits: int
-    due_date: date
-    revision_number: int
-
-
-# ============================================
-# FILE MODELS
-# ============================================
-
-class ChapterFile(BaseModel):
-    id: int
-    chapter_id: int
-    file_type: FileType
-    filename: str
-    filepath: str
-    mimetype: Optional[str]
-    file_size: Optional[int]
-    uploaded_at: datetime
-
-    class Config:
-        from_attributes = True
-
-
-# ============================================
-# STREAK & REWARDS
-# ============================================
-
-class UserStreak(BaseModel):
-    current_streak: int
-    longest_streak: int
-    total_points: int
-    last_activity: Optional[date]
-    next_reward: Optional[str] = None
-    points_to_next: Optional[int] = None
-
-
-class Reward(BaseModel):
-    id: int
-    name: str
-    icon: str
-    required_streak: int
-    unlocked: bool
-    unlocked_at: Optional[datetime]
-
-    class Config:
-        from_attributes = True
 
 
 # ============================================
 # AI MODELS
 # ============================================
 
-class AIMemory(BaseModel):
-    id: int
-    category: str
-    key: str
-    value: str
-    created_at: datetime
-    updated_at: datetime
-
-    class Config:
-        from_attributes = True
-
-
-class AIMemoryCreate(BaseModel):
-    category: str
-    key: str
-    value: str
-
-
-class AIGuideline(BaseModel):
-    id: int
-    rule: str
-    priority: int
-    active: bool
-    created_at: datetime
-
-    class Config:
-        from_attributes = True
-
-
-class AIGuidelineCreate(BaseModel):
-    rule: str
-    priority: int = 5
-
-
 class ChatMessage(BaseModel):
-    role: str  # "user", "assistant", "system"
+    role: str
     content: str
     tool_calls: Optional[List[Any]] = None
 
@@ -288,42 +179,15 @@ class ChatResponse(BaseModel):
     notifications: Optional[List[dict]] = None
 
 
-# ============================================
-# NOTIFICATION MODELS
-# ============================================
-
-class Notification(BaseModel):
-    id: int
-    type: NotificationType
-    title: str
-    message: str
-    due_at: Optional[datetime]
-    read: bool
-    dismissed: bool
-    created_at: datetime
-
-    class Config:
-        from_attributes = True
+class AIGuidelineCreate(BaseModel):
+    rule: str
+    priority: int = 5
 
 
-# ============================================
-# DEEP WORK GAP MODELS
-# ============================================
-
-class TimeSlot(BaseModel):
-    hour: int = Field(ge=0, le=23)
-    minute: int = Field(ge=0, le=59)
-
-
-class ScheduleGap(BaseModel):
-    start: str  # "HH:MM" format
-    end: str
-    duration_mins: int
-
-
-class GapAnalysisResult(BaseModel):
-    gaps: List[ScheduleGap]
-    count: int
+class AIMemoryCreate(BaseModel):
+    category: str
+    key: str
+    value: str
 
 
 # ============================================
@@ -340,6 +204,45 @@ class HealthStatus(BaseModel):
 class MorningBriefing(BaseModel):
     greeting: str
     current_streak: int
-    due_today: List[dict]
-    revisions_today: List[dict]
-    deep_work_available: int  # minutes
+    streak_icon: str = ""
+    tasks_today: int
+    revisions_due: int
+    deep_work_available: int
+    unread_notifications: int
+    next_reward: Optional[str] = None
+    points_to_next: Optional[int] = None
+
+
+class UserStreak(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    
+    id: int
+    current_streak: int = 0
+    longest_streak: int = 0
+    total_points: int = 0
+    last_activity_date: Optional[datetime] = None
+    created_at: datetime
+    updated_at: datetime
+
+
+class Notification(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    
+    id: int
+    type: NotificationType
+    title: str
+    message: str
+    read: bool = False
+    dismissed: bool = False
+    due_at: Optional[datetime] = None
+    created_at: datetime
+
+
+class AIGuideline(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    
+    id: int
+    rule: str
+    priority: int = 5
+    active: bool = True
+    created_at: datetime

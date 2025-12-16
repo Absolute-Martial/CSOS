@@ -1,6 +1,9 @@
 import type { Metadata } from 'next'
 import { Inter } from 'next/font/google'
 import './globals.css'
+import CopilotProvider from '@/providers/CopilotProvider'
+import ScheduleConfirmation from '@/components/ScheduleConfirmation'
+import AchievementPopup from '@/components/AchievementPopup'
 
 const inter = Inter({ subsets: ['latin'] })
 
@@ -17,9 +20,14 @@ export default function RootLayout({
     return (
         <html lang="en" className="dark">
             <body className={`${inter.className} bg-[#0a0a0f] min-h-screen`}>
-                <div className="flex flex-col min-h-screen">
-                    {children}
-                </div>
+                <CopilotProvider>
+                    <div className="flex flex-col min-h-screen">
+                        {children}
+                    </div>
+                    {/* Global modals and popups */}
+                    <ScheduleConfirmation />
+                    <AchievementPopup />
+                </CopilotProvider>
             </body>
         </html>
     )

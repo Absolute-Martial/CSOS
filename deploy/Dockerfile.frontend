@@ -12,6 +12,10 @@ FROM node:20-alpine AS builder
 WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY frontend/ .
+# Create public folder if it doesn't exist
+RUN mkdir -p public
+# Set build-time env vars for API routing inside Docker
+ENV INTERNAL_API_URL=http://backend:8000
 RUN npm run build
 
 # Stage 3: Production
@@ -24,7 +28,8 @@ ENV NODE_ENV=production
 RUN addgroup --system --gid 1001 nodejs
 RUN adduser --system --uid 1001 nextjs
 
-# Copy built app
+# Copy built app (create public dir first to avoid errors)
+RUN mkdir -p public
 COPY --from=builder /app/public ./public
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
