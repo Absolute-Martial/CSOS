@@ -2,7 +2,9 @@
 
 import { ReactNode, createContext, useContext, useState, useCallback } from 'react'
 import { CopilotKit } from '@copilotkit/react-core'
-import { COPILOT_CONFIG, AgentType } from '@/lib/copilot-config'
+
+// Agent type for switching between AI modes
+export type AgentType = 'study_assistant' | 'scheduler'
 
 // Types for app state shared with CopilotKit
 export interface AppState {
@@ -237,7 +239,7 @@ export default function CopilotProvider({ children }: CopilotProviderProps) {
 
     return (
         <CopilotContext.Provider value={contextValue}>
-            <CopilotKit runtimeUrl={COPILOT_CONFIG.runtimeUrl}>
+            <CopilotKit runtimeUrl="/api/copilotkit">
                 {children}
             </CopilotKit>
         </CopilotContext.Provider>

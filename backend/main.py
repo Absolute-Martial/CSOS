@@ -28,7 +28,6 @@ from models import (
     AIGuideline, AIGuidelineCreate, AIMemoryCreate
 )
 from tools import TOOL_DEFINITIONS, execute_tool, build_system_prompt
-from copilot import setup_copilotkit
 from file_handler import (
     save_uploaded_file, read_file_content, validate_filename,
     list_chapter_files, SUPPORTED_EXTENSIONS
@@ -83,8 +82,6 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
-setup_copilotkit(app, "/copilotkit")
 
 
 # ============================================

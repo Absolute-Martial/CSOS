@@ -1,61 +1,31 @@
-import { NextResponse } from 'next/server'
+import {
+  CopilotRuntime,
+  OpenAIAdapter,
+  copilotRuntimeNextJSAppRouterEndpoint,
+} from '@copilotkit/runtime';
+import OpenAI from 'openai';
 
-type CopilotKitProxyError = {
-  error: string
-  details?: unknown
-}
+// Use copilot-api as OpenAI-compatible endpoint
+const COPILOT_API_URL = process.env.COPILOT_API_URL || 'http://localhost:4141/v1';
 
-function getBackendUrl(): string {
-  // Prefer INTERNAL_API_URL for server-side (Docker network), fallback to public/local.
-  return (
-    process.env.INTERNAL_API_URL ||
-    process.env.NEXT_PUBLIC_API_URL ||
-    'http://localhost:8000'
-  )
-}
+// Create OpenAI client pointing to copilot-api
+const openai = new OpenAI({
+  baseURL: COPILOT_API_URL,
+  apiKey: 'dummy-key', // copilot-api doesn't require a real key
+});
 
-export async function POST(req: Request) {
-  const backendBaseUrl = getBackendUrl().replace(/\/+$/, '')
-  const targetUrl = `${backendBaseUrl}/copilotkit`
+// Create the service adapter
+const serviceAdapter = new OpenAIAdapter({ openai });
 
-  try {
-    const contentType = req.headers.get('content-type') || ''
+// Create CopilotRuntime with the adapter
+const runtime = new CopilotRuntime();
 
-    // CopilotKit typically sends JSON, but we proxy whatever bytes we receive.
-    const body = await req.arrayBuffer()
+export const POST = async (req: Request) => {
+  const { handleRequest } = copilotRuntimeNextJSAppRouterEndpoint({
+    runtime,
+    serviceAdapter,
+    endpoint: '/api/copilotkit',
+  });
 
-    const upstreamRes = await fetch(targetUrl, {
-      method: 'POST',
-      // Forward content-type and auth headers if present.
-      headers: {
-        ...(contentType ? { 'content-type': contentType } : {}),
-        ...(req.headers.get('authorization')
-          ? { authorization: req.headers.get('authorization') as string }
-          : {}),
-      },
-      body,
-      // Prevent Next.js from caching API proxy requests.
-      cache: 'no-store',
-    })
-
-    const upstreamContentType =
-      upstreamRes.headers.get('content-type') || 'application/json'
-
-    // Return upstream response as-is (status + body), preserving content-type.
-    const responseBody = await upstreamRes.arrayBuffer()
-
-    return new NextResponse(responseBody, {
-      status: upstreamRes.status,
-      headers: {
-        'content-type': upstreamContentType,
-      },
-    })
-  } catch (err) {
-    const payload: CopilotKitProxyError = {
-      error: 'Failed to proxy CopilotKit request to backend',
-      details: err instanceof Error ? err.message : err,
-    }
-
-    return NextResponse.json(payload, { status: 502 })
-  }
-}
+  return handleRequest(req);
+};
