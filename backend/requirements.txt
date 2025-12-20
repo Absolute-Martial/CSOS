@@ -2,31 +2,35 @@
 # For Docker (Python 3.12)
 
 # Core
-fastapi==0.109.0
-uvicorn[standard]==0.27.0
-pydantic==2.5.3
-pydantic-settings==2.1.0
+fastapi>=0.109.0
+uvicorn[standard]>=0.27.0
+pydantic>=2.5.3
+pydantic-settings>=2.1.0
 
 # Database
-asyncpg==0.29.0
-sqlalchemy[asyncio]==2.0.25
+asyncpg>=0.29.0
+sqlalchemy[asyncio]>=2.0.25
 
 # HTTP Client
-httpx==0.26.0
+httpx>=0.26.0
 
 # File Processing
-python-multipart==0.0.6
-pypdf==3.17.4
-python-docx==1.1.0
-python-pptx==0.6.23
-aiofiles==23.2.1
+python-multipart>=0.0.6
+pypdf>=3.17.4
+python-docx
+python-pptx
+aiofiles>=23.2.1
 
 # Utilities
-python-dateutil==2.8.2
+python-dateutil>=2.8.2
 
-# CopilotKit & LangGraph Integration
+# AI / LLM Integration
+openai>=1.6.0
 copilotkit>=0.1.0
 langgraph>=0.2.0
 langchain-anthropic>=0.2.0
+langchain-openai>=0.2.0
 langchain-core>=0.3.0
 langchain>=0.3.0
+
+

@@ -3,6 +3,8 @@
 import { useEffect, useState } from 'react'
 import Dashboard from '@/components/Dashboard'
 import AICommandCenter from '@/components/AICommandCenter'
+import AISchedulerPanel from '@/components/AISchedulerPanel'
+import SettingsPanel from '@/components/SettingsPanel'
 import SystemBadge from '@/components/SystemBadge'
 import StudyTimer from '@/components/StudyTimer'
 import TodayDashboard from '@/components/TodayDashboard'
@@ -12,7 +14,7 @@ import LabReportTracker from '@/components/LabReportTracker'
 import StudyAnalytics from '@/components/StudyAnalytics'
 import GoalTracker from '@/components/GoalTracker'
 
-type TabType = 'today' | 'timeline' | 'tasks' | 'labs' | 'analytics' | 'goals'
+type TabType = 'today' | 'timeline' | 'tasks' | 'labs' | 'analytics' | 'goals' | 'ai-scheduler' | 'settings'
 
 interface Briefing {
     greeting: string
@@ -50,11 +52,14 @@ export default function Home() {
     const tabs = [
         { id: 'today' as TabType, label: 'Today', icon: '📊' },
         { id: 'timeline' as TabType, label: 'Timeline', icon: '📅' },
+        { id: 'ai-scheduler' as TabType, label: 'AI Scheduler', icon: '🧠' },
         { id: 'tasks' as TabType, label: 'Tasks', icon: '✅' },
         { id: 'labs' as TabType, label: 'Labs', icon: '🧪' },
         { id: 'analytics' as TabType, label: 'Analytics', icon: '📈' },
         { id: 'goals' as TabType, label: 'Goals', icon: '🎯' },
+        { id: 'settings' as TabType, label: 'Settings', icon: '⚙️' },
     ]
+
 
     const renderTabContent = () => {
         switch (activeTab) {
@@ -63,10 +68,12 @@ export default function Home() {
             case 'timeline':
                 return (
                     <div className="space-y-6">
-                        <ScheduleInput onScheduleChange={() => {}} />
+                        <ScheduleInput onScheduleChange={() => { }} />
                         <TimelineView />
                     </div>
                 )
+            case 'ai-scheduler':
+                return <AISchedulerPanel />
             case 'tasks':
                 return <Dashboard />
             case 'labs':
@@ -75,6 +82,8 @@ export default function Home() {
                 return <StudyAnalytics />
             case 'goals':
                 return <GoalTracker />
+            case 'settings':
+                return <SettingsPanel />
             default:
                 return <TodayDashboard />
         }
@@ -131,11 +140,10 @@ export default function Home() {
                             <button
                                 key={tab.id}
                                 onClick={() => setActiveTab(tab.id)}
-                                className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-colors whitespace-nowrap ${
-                                    activeTab === tab.id
-                                        ? 'bg-primary text-white'
-                                        : 'text-zinc-400 hover:text-white hover:bg-surface-light'
-                                }`}
+                                className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-colors whitespace-nowrap ${activeTab === tab.id
+                                    ? 'bg-primary text-white'
+                                    : 'text-zinc-400 hover:text-white hover:bg-surface-light'
+                                    }`}
                             >
                                 <span>{tab.icon}</span>
                                 <span className="text-sm font-medium">{tab.label}</span>

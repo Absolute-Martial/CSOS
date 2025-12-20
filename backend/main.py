@@ -32,6 +32,8 @@ from file_handler import (
     save_uploaded_file, read_file_content, validate_filename,
     list_chapter_files, SUPPORTED_EXTENSIONS
 )
+from logger import logger
+from settings_manager import SettingsManager
 
 
 # Configuration
@@ -59,6 +61,9 @@ async def lifespan(app: FastAPI):
     achievement_result = await initialize_achievements()
     await log_system("info", "Achievement system initialized", achievement_result)
 
+    await log_system("info", "Achievement system initialized", achievement_result)
+
+    logger.info(f"Server started (Version 1.0.1)")
     await log_system("info", "Server started", {"version": "1.0.1"})
     yield
     # Shutdown
@@ -133,10 +138,14 @@ async def chat_with_ai(request: ChatRequest):
         ]
         
         async with httpx.AsyncClient() as client:
+            # Get model from settings
+            settings = SettingsManager.get_all_settings()
+            model_name = settings.get("AI_MODEL_NAME", "gpt-4")
+            
             response = await client.post(
                 f"{COPILOT_API_URL}/v1/chat/completions",
                 json={
-                    "model": "gpt-4",
+                    "model": model_name,
                     "messages": messages,
                     "tools": TOOL_DEFINITIONS,
                     "tool_choice": "auto"
@@ -795,6 +804,28 @@ async def get_all_deadlines(days: int = Query(default=14, ge=1, le=60)):
         "count": len(deadlines),
         "days": days
     }
+
+
+# ============================================
+# SETTINGS & CONFIGURATION
+# ============================================
+
+@app.get("/api/settings")
+async def get_settings():
+    """Get all manageable settings."""
+    return SettingsManager.get_manageable_settings()
+
+@app.post("/api/settings")
+async def update_setting_endpoint(
+    key: str = Form(...),
+    value: str = Form(...)
+):
+    """Update a specific environment setting."""
+    success = SettingsManager.update_setting(key, value)
+    if not success:
+        raise HTTPException(status_code=500, detail="Failed to update setting")
+    
+    return {"success": True, "key": key, "value": value}
 
 
 # ============================================

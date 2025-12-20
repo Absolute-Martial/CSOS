@@ -822,6 +822,107 @@ TOOL_DEFINITIONS = [
                 "required": ["title", "message", "scheduled_time"]
             }
         }
+    },
+    # ============================================
+    # C ENGINE OPTIMIZATION TOOLS
+    # ============================================
+    {
+        "type": "function",
+        "function": {
+            "name": "optimize_weekly_timeline",
+            "description": "Optimize the weekly schedule using the C constraint satisfaction solver. Returns an optimized timeline with task placements respecting sleep, classes, and energy levels.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "include_concept_tasks": {"type": "boolean", "description": "Include conceptual study tasks (morning priority)"},
+                    "include_practice_tasks": {"type": "boolean", "description": "Include practice/problem-solving tasks (evening priority)"},
+                    "respect_energy_levels": {"type": "boolean", "description": "Place tasks according to daily energy patterns"}
+                },
+                "required": []
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "fill_micro_gaps",
+            "description": "Identify and fill small schedule gaps (15-30 mins) with appropriate micro-tasks like flashcard review or quick reading.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "target_date": {"type": "string", "description": "Date to analyze (YYYY-MM-DD), defaults to today"},
+                    "suggested_tasks": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                        "description": "Optional list of micro-task suggestions"
+                    }
+                },
+                "required": []
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "get_schedule_gaps",
+            "description": "Get all gaps in the schedule categorized by type: micro (<30min), standard (30-60min), and deep_work (>60min).",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "days_ahead": {"type": "integer", "description": "Number of days to analyze (default 7)"},
+                    "min_duration_mins": {"type": "integer", "description": "Minimum gap duration to include (default 15)"}
+                },
+                "required": []
+            }
+        }
+    },
+    # ============================================
+    # PROGRESS TRACKING TOOLS
+    # ============================================
+    {
+        "type": "function",
+        "function": {
+            "name": "get_progress_summary",
+            "description": "Get a comprehensive progress summary with metrics, insights, achievements, and recommendations.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "period": {
+                        "type": "string",
+                        "enum": ["today", "this_week", "this_month", "all_time"],
+                        "description": "Time period for analysis"
+                    },
+                    "subject_code": {"type": "string", "description": "Optional subject to focus on"}
+                },
+                "required": []
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "get_subject_progress",
+            "description": "Get detailed progress for a specific subject including chapters completed, mastery level, and study hours.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "subject_code": {"type": "string", "description": "Subject code like MATH101"}
+                },
+                "required": ["subject_code"]
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "trigger_notifications_check",
+            "description": "Trigger a check for any notifications that should be sent (deadlines, revisions, achievements).",
+            "parameters": {
+                "type": "object",
+                "properties": {},
+                "required": []
+            }
+        }
     }
 ]
 
@@ -888,6 +989,14 @@ async def execute_tool(name: str, arguments: Dict[str, Any]) -> Dict[str, Any]:
         # Proactive Notification tools
         "send_proactive_notification": tool_send_proactive_notification,
         "schedule_reminder": tool_schedule_reminder,
+        # C Engine Optimization tools
+        "optimize_weekly_timeline": tool_optimize_weekly_timeline,
+        "fill_micro_gaps": tool_fill_micro_gaps,
+        "get_schedule_gaps": tool_get_schedule_gaps,
+        # Progress Tracking tools
+        "get_progress_summary": tool_get_progress_summary,
+        "get_subject_progress": tool_get_subject_progress,
+        "trigger_notifications_check": tool_trigger_notifications_check,
     }
     
     handler = handlers.get(name)
@@ -1834,3 +1943,358 @@ async def tool_schedule_reminder(args: Dict[str, Any]) -> Dict[str, Any]:
         "success": False,
         "message": "Failed to schedule reminder (may be duplicate)"
     }
+
+
+# ============================================
+# C ENGINE OPTIMIZATION TOOL IMPLEMENTATIONS
+# ============================================
+
+async def tool_optimize_weekly_timeline(args: Dict[str, Any]) -> Dict[str, Any]:
+    """Optimize the weekly timeline using C engine."""
+    from bridge import get_scheduler_engine, TaskCategory
+    from database import db
+    from datetime import date, timedelta
+    
+    engine = get_scheduler_engine()
+    
+    # Gather tasks to optimize
+    today = date.today()
+    tasks = []
+    
+    try:
+        # Get pending tasks from database
+        query = """
+            SELECT id, title, duration_mins, priority, subject_id, 
+                   scheduled_start, deadline, is_deep_work, task_type
+            FROM tasks
+            WHERE status = 'pending' AND deadline >= $1
+            ORDER BY priority DESC, deadline
+            LIMIT 50
+        """
+        rows = await db.fetch(query, today)
+        
+        for row in rows:
+            # Determine task category
+            task_type = row.get('task_type', 'study')
+            if task_type in ('study', 'revision'):
+                category = TaskCategory.STUDY_CONCEPT
+            elif task_type in ('practice', 'assignment'):
+                category = TaskCategory.STUDY_PRACTICE
+            elif task_type == 'lab_work':
+                category = TaskCategory.STUDY_PRACTICE
+            else:
+                category = TaskCategory.STUDY_CONCEPT
+            
+            # Filter based on args
+            if not args.get('include_concept_tasks', True) and category == TaskCategory.STUDY_CONCEPT:
+                continue
+            if not args.get('include_practice_tasks', True) and category == TaskCategory.STUDY_PRACTICE:
+                continue
+            
+            # Calculate deadline slot
+            deadline_date = row.get('deadline', today + timedelta(days=7))
+            if isinstance(deadline_date, date):
+                days_until = (deadline_date - today).days
+                deadline_slot = min(days_until * 48, 336 - 1)  # 48 slots per day
+            else:
+                deadline_slot = 336 - 1
+            
+            tasks.append({
+                'id': row['id'],
+                'title': row.get('title', 'Untitled'),
+                'duration_slots': max(1, (row.get('duration_mins', 60) + 29) // 30),  # Round up to 30-min slots
+                'priority': row.get('priority', 5),
+                'category': category,
+                'deadline_slot': deadline_slot,
+                'is_locked': False,
+            })
+        
+        # Get fixed classes
+        from scheduler import get_timetable_for_date
+        for day_offset in range(7):
+            target_date = today + timedelta(days=day_offset)
+            timetable = await get_timetable_for_date(target_date)
+            
+            for cls in timetable:
+                start_parts = cls['start'].split(':')
+                start_slot = int(start_parts[0]) * 2 + (1 if int(start_parts[1]) >= 30 else 0)
+                end_parts = cls['end'].split(':')
+                end_slot = int(end_parts[0]) * 2 + (1 if int(end_parts[1]) >= 30 else 0)
+                duration_slots = end_slot - start_slot
+                
+                tasks.append({
+                    'id': 10000 + day_offset * 100 + start_slot,  # Synthetic ID
+                    'title': f"{cls.get('subject', 'Class')} - {cls.get('type', 'lecture')}",
+                    'duration_slots': duration_slots,
+                    'priority': 10,
+                    'category': TaskCategory.FIXED_CLASS,
+                    'deadline_slot': day_offset * 48 + end_slot,
+                    'is_locked': True,
+                    'preferred_slot': day_offset * 48 + start_slot,
+                })
+        
+        # Run optimization
+        result = engine.optimize_timeline(tasks, None)
+        
+        return {
+            "success": result.success,
+            "status": result.status_message,
+            "optimized_tasks": result.tasks,
+            "gaps_filled": result.gaps_filled,
+            "conflicts": result.conflicts,
+            "execution_time_ms": result.execution_time_ms,
+            "message": f"Optimized {len(tasks)} tasks in {result.execution_time_ms:.1f}ms"
+        }
+        
+    except Exception as e:
+        return {
+            "success": False,
+            "error": str(e),
+            "message": f"Optimization failed: {str(e)}"
+        }
+
+
+async def tool_fill_micro_gaps(args: Dict[str, Any]) -> Dict[str, Any]:
+    """Identify and fill micro gaps with suggested tasks."""
+    from bridge import get_scheduler_engine
+    from scheduler import analyze_day_gaps
+    from datetime import datetime, date
+    
+    # Parse target date
+    target_date = date.today()
+    if args.get('target_date'):
+        try:
+            target_date = datetime.fromisoformat(args['target_date']).date()
+        except ValueError:
+            pass
+    
+    # Analyze gaps
+    gap_analysis = await analyze_day_gaps(target_date)
+    
+    # Filter for micro gaps (< 30 min)
+    micro_gaps = [
+        g for g in gap_analysis.get('gaps', [])
+        if g.get('duration_minutes', 0) <= 30 and g.get('duration_minutes', 0) >= 15
+    ]
+    
+    # Default micro-task suggestions
+    default_suggestions = [
+        "Review flashcards",
+        "Quick chapter summary read",
+        "Practice 2-3 problems",
+        "Review today's notes",
+        "Lab report quick review",
+    ]
+    
+    suggestions = args.get('suggested_tasks', default_suggestions)
+    
+    # Match suggestions to gaps
+    filled_gaps = []
+    for i, gap in enumerate(micro_gaps):
+        suggestion = suggestions[i % len(suggestions)]
+        filled_gaps.append({
+            "gap_start": gap.get('start_time'),
+            "gap_end": gap.get('end_time'),
+            "duration_minutes": gap.get('duration_minutes'),
+            "suggested_task": suggestion,
+            "priority": "low",
+        })
+    
+    return {
+        "success": True,
+        "target_date": str(target_date),
+        "micro_gaps_found": len(micro_gaps),
+        "filled_gaps": filled_gaps,
+        "total_gap_minutes": sum(g.get('duration_minutes', 0) for g in micro_gaps),
+        "message": f"Found {len(micro_gaps)} micro-gaps that can be filled"
+    }
+
+
+async def tool_get_schedule_gaps(args: Dict[str, Any]) -> Dict[str, Any]:
+    """Get all schedule gaps categorized by type."""
+    from scheduler import analyze_day_gaps
+    from datetime import date, timedelta
+    
+    days_ahead = args.get('days_ahead', 7)
+    min_duration = args.get('min_duration_mins', 15)
+    
+    today = date.today()
+    all_gaps = {
+        "micro": [],      # < 30 min
+        "standard": [],   # 30-60 min
+        "deep_work": [],  # > 60 min
+    }
+    
+    for day_offset in range(days_ahead):
+        target_date = today + timedelta(days=day_offset)
+        gap_analysis = await analyze_day_gaps(target_date)
+        
+        for gap in gap_analysis.get('gaps', []):
+            duration = gap.get('duration_minutes', 0)
+            
+            if duration < min_duration:
+                continue
+            
+            gap_entry = {
+                "date": str(target_date),
+                "day_name": target_date.strftime("%A"),
+                **gap
+            }
+            
+            if duration < 30:
+                all_gaps["micro"].append(gap_entry)
+            elif duration <= 60:
+                all_gaps["standard"].append(gap_entry)
+            else:
+                all_gaps["deep_work"].append(gap_entry)
+    
+    return {
+        "success": True,
+        "days_analyzed": days_ahead,
+        "gaps": all_gaps,
+        "summary": {
+            "micro_count": len(all_gaps["micro"]),
+            "standard_count": len(all_gaps["standard"]),
+            "deep_work_count": len(all_gaps["deep_work"]),
+            "total_micro_mins": sum(g.get('duration_minutes', 0) for g in all_gaps["micro"]),
+            "total_standard_mins": sum(g.get('duration_minutes', 0) for g in all_gaps["standard"]),
+            "total_deep_work_mins": sum(g.get('duration_minutes', 0) for g in all_gaps["deep_work"]),
+        },
+        "message": f"Found {len(all_gaps['deep_work'])} deep work opportunities"
+    }
+
+
+# ============================================
+# PROGRESS TRACKING TOOL IMPLEMENTATIONS
+# ============================================
+
+async def tool_get_progress_summary(args: Dict[str, Any]) -> Dict[str, Any]:
+    """Get comprehensive progress summary."""
+    from agents.progress_tracker_agent import (
+        get_progress_tracker_agent,
+        AnalysisPeriod
+    )
+    
+    # Map period string to enum
+    period_map = {
+        "today": AnalysisPeriod.TODAY,
+        "this_week": AnalysisPeriod.THIS_WEEK,
+        "this_month": AnalysisPeriod.THIS_MONTH,
+        "all_time": AnalysisPeriod.ALL_TIME,
+    }
+    
+    period = period_map.get(args.get('period', 'this_week'), AnalysisPeriod.THIS_WEEK)
+    subject = args.get('subject_code')
+    
+    agent = get_progress_tracker_agent()
+    
+    try:
+        result = await agent.analyze(
+            query="Show my progress summary",
+            period=period,
+            subject=subject
+        )
+        
+        return {
+            "success": True,
+            **result
+        }
+    except Exception as e:
+        return {
+            "success": False,
+            "error": str(e),
+            "message": f"Failed to get progress summary: {str(e)}"
+        }
+
+
+async def tool_get_subject_progress(args: Dict[str, Any]) -> Dict[str, Any]:
+    """Get detailed progress for a specific subject."""
+    from database import db, get_subject_by_code
+    
+    subject_code = args.get('subject_code', '').upper()
+    
+    if not subject_code:
+        return {"error": "Subject code is required"}
+    
+    subject = await get_subject_by_code(subject_code)
+    if not subject:
+        return {"error": f"Subject {subject_code} not found"}
+    
+    try:
+        # Get chapter progress
+        query = """
+            SELECT 
+                c.id, c.number, c.title, c.total_pages,
+                cp.reading_status, cp.assignment_status, cp.mastery_level,
+                cp.revision_count, cp.last_revised_at
+            FROM chapters c
+            LEFT JOIN chapter_progress cp ON cp.chapter_id = c.id
+            WHERE c.subject_id = $1
+            ORDER BY c.number
+        """
+        chapters = await db.fetch(query, subject['id'])
+        
+        # Get study hours
+        hours_query = """
+            SELECT COALESCE(SUM(duration_minutes) / 60.0, 0) as hours
+            FROM study_sessions
+            WHERE subject_code = $1
+        """
+        hours_result = await db.fetchrow(hours_query, subject_code)
+        total_hours = float(hours_result['hours']) if hours_result else 0
+        
+        # Calculate completion
+        completed = sum(1 for c in chapters if c.get('reading_status') == 'completed')
+        total = len(chapters)
+        completion_pct = (completed / total * 100) if total > 0 else 0
+        
+        # Average mastery
+        mastery_levels = [c.get('mastery_level', 0) for c in chapters if c.get('mastery_level')]
+        avg_mastery = sum(mastery_levels) / len(mastery_levels) if mastery_levels else 0
+        
+        return {
+            "success": True,
+            "subject_code": subject_code,
+            "subject_name": subject['name'],
+            "subject_type": subject.get('type', 'unknown'),
+            "chapters": [dict(c) for c in chapters],
+            "summary": {
+                "total_chapters": total,
+                "completed_chapters": completed,
+                "completion_percentage": round(completion_pct, 1),
+                "average_mastery": round(avg_mastery, 1),
+                "total_study_hours": round(total_hours, 1),
+            },
+            "message": f"{subject_code}: {completed}/{total} chapters complete ({completion_pct:.0f}%)"
+        }
+        
+    except Exception as e:
+        return {
+            "success": False,
+            "error": str(e),
+            "message": f"Failed to get subject progress: {str(e)}"
+        }
+
+
+async def tool_trigger_notifications_check(args: Dict[str, Any]) -> Dict[str, Any]:
+    """Trigger a notifications check."""
+    from agents.notifier_agent import get_notifier_agent
+    
+    agent = get_notifier_agent()
+    
+    try:
+        result = await agent.run(trigger_type="manual")
+        
+        return {
+            "success": True,
+            "notifications_generated": result.get('count', 0),
+            "notifications": result.get('notifications', []),
+            "message": f"Generated {result.get('count', 0)} notifications"
+        }
+    except Exception as e:
+        return {
+            "success": False,
+            "error": str(e),
+            "message": f"Notification check failed: {str(e)}"
+        }
+
