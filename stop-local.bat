@@ -7,7 +7,7 @@ echo Stopping all services...
 echo.
 
 :: Stop Docker container
-docker stop eng-db 2>nul
+docker stop engineering-os-db 2>nul
 echo [x] PostgreSQL stopped
 
 :: Kill Node processes (copilot-api and Next.js)

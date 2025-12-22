@@ -98,7 +98,7 @@ CSOS/
 |   +-- Makefile             # Build configuration
 |
 +-- deploy/
-|   +-- docker-compose.yml   # Full stack deployment
+|   +-- docker-compose.yml   # Full stack deployment (see deploy/docker-compose.yml)
 |   +-- Dockerfile.backend   # Multi-stage backend build
 |   +-- Dockerfile.frontend  # Multi-stage frontend build
 |   +-- .env.example         # Environment template
@@ -141,11 +141,10 @@ npx copilot-api@latest start
 # Follow browser prompts, then Ctrl+C
 
 # 2. Start all services
-cd deploy
-docker-compose up -d
+docker compose up -d
 
 # 3. View logs
-docker-compose logs -f
+docker compose logs -f
 
 # Services available at:
 # - Frontend: http://localhost:3000
@@ -314,8 +313,8 @@ docker ps | grep engineering-os-db
 docker logs engineering-os-db
 
 # Reset database (CAUTION: loses data)
-docker-compose down -v
-docker-compose up -d
+docker compose down -v
+docker compose up -d
 ```
 
 ### Schedule Not Showing Classes

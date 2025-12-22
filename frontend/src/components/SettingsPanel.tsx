@@ -23,19 +23,34 @@ interface SettingCategory {
 
 export default function SettingsPanel() {
     const [settings, setSettings] = useState<SettingCategory[]>([])
+    const [fetchedModels, setFetchedModels] = useState<string[]>([])
     const [loading, setLoading] = useState(true)
     const [saving, setSaving] = useState<string | null>(null)
     const [message, setMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null)
 
     useEffect(() => {
         fetchSettings()
+        fetchModels()
     }, [])
+
+    const fetchModels = async () => {
+        try {
+            const res = await fetch('/api/ai/models')
+            if (res.ok) {
+                const data = await res.json()
+                setFetchedModels(data)
+            }
+        } catch (error) {
+            console.error('Failed to fetch models:', error)
+        }
+    }
 
     const fetchSettings = async () => {
         try {
             const res = await fetch('/api/settings')
             if (res.ok) {
                 const data = await res.json()
+                // Inject fetched models if available
                 setSettings(data)
             }
         } catch (error) {
@@ -101,53 +116,60 @@ export default function SettingsPanel() {
                     </h3>
 
                     <div className="grid gap-6">
-                        {category.settings.map((setting) => (
-                            <div key={setting.key} className="grid grid-cols-1 md:grid-cols-3 gap-4 items-start">
-                                <div>
-                                    <label className="block text-sm font-medium text-zinc-200 mb-1">
-                                        {setting.label}
-                                    </label>
-                                    <p className="text-xs text-zinc-500">{setting.description}</p>
-                                    <code className="text-[10px] text-zinc-600 mt-1 block">{setting.key}</code>
-                                </div>
+                        {category.settings.map((setting) => {
+                            // Use fetched models if available for AI Model setting
+                            const options = (setting.key === 'AI_MODEL_NAME' && fetchedModels.length > 0)
+                                ? fetchedModels
+                                : setting.options
 
-                                <div className="md:col-span-2 flex gap-2">
-                                    {setting.type === 'select' ? (
-                                        <select
-                                            className="flex-1 bg-surface-light border border-white/10 rounded-lg px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-primary"
-                                            defaultValue={setting.value}
-                                            onChange={(e) => handleSave(setting.key, e.target.value)}
-                                            disabled={saving === setting.key}
-                                        >
-                                            {setting.options?.map(opt => (
-                                                <option key={opt} value={opt}>{opt}</option>
-                                            ))}
-                                        </select>
-                                    ) : (
-                                        <input
-                                            type={setting.type}
-                                            className="flex-1 bg-surface-light border border-white/10 rounded-lg px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-primary disabled:opacity-50"
-                                            defaultValue={setting.value}
-                                            min={setting.min}
-                                            max={setting.max}
-                                            step={setting.step}
-                                            onBlur={(e) => {
-                                                if (e.target.value !== String(setting.value)) {
-                                                    handleSave(setting.key, e.target.value)
-                                                }
-                                            }}
-                                            disabled={saving === setting.key}
-                                        />
-                                    )}
+                            return (
+                                <div key={setting.key} className="grid grid-cols-1 md:grid-cols-3 gap-4 items-start">
+                                    <div>
+                                        <label className="block text-sm font-medium text-zinc-200 mb-1">
+                                            {setting.label}
+                                        </label>
+                                        <p className="text-xs text-zinc-500">{setting.description}</p>
+                                        <code className="text-[10px] text-zinc-600 mt-1 block">{setting.key}</code>
+                                    </div>
 
-                                    {saving === setting.key && (
-                                        <div className="flex items-center justify-center px-3">
-                                            <RefreshCw className="w-4 h-4 text-zinc-400 animate-spin" />
-                                        </div>
-                                    )}
+                                    <div className="md:col-span-2 flex gap-2">
+                                        {setting.type === 'select' ? (
+                                            <select
+                                                className="flex-1 bg-surface-light border border-white/10 rounded-lg px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-primary"
+                                                defaultValue={setting.value}
+                                                onChange={(e) => handleSave(setting.key, e.target.value)}
+                                                disabled={saving === setting.key}
+                                            >
+                                                {options?.map(opt => (
+                                                    <option key={opt} value={opt}>{opt}</option>
+                                                ))}
+                                            </select>
+                                        ) : (
+                                            <input
+                                                type={setting.type}
+                                                className="flex-1 bg-surface-light border border-white/10 rounded-lg px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-primary disabled:opacity-50"
+                                                defaultValue={setting.value}
+                                                min={setting.min}
+                                                max={setting.max}
+                                                step={setting.step}
+                                                onBlur={(e) => {
+                                                    if (e.target.value !== String(setting.value)) {
+                                                        handleSave(setting.key, e.target.value)
+                                                    }
+                                                }}
+                                                disabled={saving === setting.key}
+                                            />
+                                        )}
+
+                                        {saving === setting.key && (
+                                            <div className="flex items-center justify-center px-3">
+                                                <RefreshCw className="w-4 h-4 text-zinc-400 animate-spin" />
+                                            </div>
+                                        )}
+                                    </div>
                                 </div>
-                            </div>
-                        ))}
+                            )
+                        })}
                     </div>
                 </div>
             ))}

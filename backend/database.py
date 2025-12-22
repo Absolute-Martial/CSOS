@@ -10,11 +10,24 @@ from typing import Any, Optional, List
 import asyncpg
 
 
-# Database configuration
-DATABASE_URL = os.getenv(
-    "DATABASE_URL",
-    "postgresql://postgres:postgres@localhost:5432/engineering_os"
-)
+def _default_database_url() -> str:
+    """Choose a sensible default DB URL.
+
+    - Local dev: Postgres on localhost
+    - Docker/Compose: use the `db` service hostname
+
+    Users can always override by setting DATABASE_URL.
+    """
+    # Heuristic: when running inside a container, /.dockerenv typically exists.
+    in_docker = os.path.exists("/.dockerenv") or os.getenv("DOCKER") == "true"
+    if in_docker:
+        return "postgresql://postgres:postgres@db:5432/engineering_os"
+    return "postgresql://postgres:postgres@localhost:5432/engineering_os"
+
+
+def get_database_url() -> str:
+    """Get the database URL from environment (evaluated at runtime)."""
+    return os.getenv("DATABASE_URL") or _default_database_url()
 
 
 class Database:
@@ -25,8 +38,9 @@ class Database:
     
     async def connect(self):
         """Create connection pool."""
-        self._pool = await asyncpg.create_pool(DATABASE_URL, min_size=2, max_size=10)
-        print(f"✓ Database connected")
+        database_url = get_database_url()
+        self._pool = await asyncpg.create_pool(database_url, min_size=2, max_size=10)
+        print("✓ Database connected")
     
     async def disconnect(self):
         """Close connection pool."""

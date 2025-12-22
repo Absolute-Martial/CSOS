@@ -198,6 +198,49 @@ async def chat_with_ai(request: ChatRequest):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@app.get("/api/ai/models", response_model=List[str])
+async def list_ai_models():
+    """Fetch available models from the AI provider."""
+    try:
+        settings = SettingsManager.get_all_settings()
+        base_url = settings.get("AI_API_BASE_URL", COPILOT_API_URL)
+        api_key = settings.get("AI_API_KEY", "dummy")
+        
+        # Determine URL structure (standard vs custom)
+        # Default OpenAI: /v1/models
+        # copilot-api: /v1/models (proxied)
+        url = f"{base_url}/models"
+        if base_url.endswith("/v1"):
+             # Handle double /v1 or missing
+             pass
+        else:
+             url = f"{base_url}/v1/models"
+
+        # Simpler approach: reliance on configured URL structure
+        # If user provides ".../v1", we use it as base.
+        # Standard OpenAI list models: GET /models relative to base.
+        
+        # Clean up base url
+        target_url = base_url.rstrip("/") + "/models"
+        
+        async with httpx.AsyncClient() as client:
+            headers = {"Authorization": f"Bearer {api_key}"}
+            resp = await client.get(target_url, headers=headers, timeout=10)
+            
+            if resp.status_code == 200:
+                data = resp.json()
+                # Extract IDs
+                return [m["id"] for m in data.get("data", [])]
+            else:
+                # Fallback on error
+                logger.warning(f"Failed to fetch models: {resp.status_code}")
+                return ["gpt-4", "gpt-3.5-turbo", "claude-3-sonnet", "llama3"]
+                
+    except Exception as e:
+        logger.error(f"Error fetching models: {e}")
+        return ["gpt-4", "gpt-3.5-turbo", "claude-3-sonnet", "llama3"]
+
+
 @app.get("/api/briefing", response_model=MorningBriefing)
 async def get_morning_briefing():
     """Get daily briefing summary."""

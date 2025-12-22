@@ -358,7 +358,7 @@ class NotificationGenerator:
                 s.code as subject_code, 'lab_report' as item_type
             FROM lab_reports lr
             JOIN subjects s ON lr.subject_id = s.id
-            WHERE lr.status NOT IN ('submitted', 'cancelled')
+            WHERE lr.status NOT IN ('completed', 'cancelled')
               AND lr.deadline BETWEEN NOW() AND NOW() + INTERVAL '25 hours'
         """)
         deadlines.extend(labs)
