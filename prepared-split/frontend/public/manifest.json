@@ -1,0 +1,55 @@
+{
+    "name": "Engineering OS",
+    "short_name": "EngOS",
+    "description": "AI-powered study management for KU Engineering students",
+    "start_url": "/",
+    "display": "standalone",
+    "background_color": "#0a0a0f",
+    "theme_color": "#42D674",
+    "orientation": "portrait-primary",
+    "icons": [
+        {
+            "src": "/icons/icon-192.png",
+            "sizes": "192x192",
+            "type": "image/png",
+            "purpose": "any maskable"
+        },
+        {
+            "src": "/icons/icon-512.png",
+            "sizes": "512x512",
+            "type": "image/png",
+            "purpose": "any maskable"
+        }
+    ],
+    "categories": [
+        "education",
+        "productivity"
+    ],
+    "screenshots": [],
+    "shortcuts": [
+        {
+            "name": "Today's Dashboard",
+            "short_name": "Today",
+            "description": "View today's schedule and tasks",
+            "url": "/?tab=today",
+            "icons": [
+                {
+                    "src": "/icons/today.png",
+                    "sizes": "96x96"
+                }
+            ]
+        },
+        {
+            "name": "Start Timer",
+            "short_name": "Timer",
+            "description": "Start a study timer",
+            "url": "/?action=timer",
+            "icons": [
+                {
+                    "src": "/icons/timer.png",
+                    "sizes": "96x96"
+                }
+            ]
+        }
+    ]
+}

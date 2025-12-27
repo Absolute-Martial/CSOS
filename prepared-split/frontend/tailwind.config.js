@@ -13,11 +13,13 @@ module.exports = {
                 'phys': '#ef4444',
                 'chem': '#22c55e',
                 'engg': '#f59e0b',
-                // UI colors
-                'primary': '#6366f1',
-                'surface': '#1e1e2e',
-                'surface-light': '#2a2a3e',
-                'accent': '#a78bfa',
+                // UI colors - Light Teal Theme
+                'primary': '#2A9D8F',       // Deep Teal - main actions
+                'secondary': '#B6F2D1',     // Mint - secondary elements
+                'accent': '#85D1DB',        // Teal - highlights
+                'sage': '#B3EBF2',          // Light Teal - subtle backgrounds
+                'surface': '#B3EBF2',
+                'surface-light': '#85D1DB',
             },
             animation: {
                 'pulse-slow': 'pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite',

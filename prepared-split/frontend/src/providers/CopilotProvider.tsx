@@ -1,7 +1,6 @@
 'use client'
 
 import { ReactNode, createContext, useContext, useState, useCallback } from 'react'
-import { CopilotKit } from '@copilotkit/react-core'
 
 // Agent type for switching between AI modes
 export type AgentType = 'study_assistant' | 'scheduler'
@@ -239,9 +238,7 @@ export default function CopilotProvider({ children }: CopilotProviderProps) {
 
     return (
         <CopilotContext.Provider value={contextValue}>
-            <CopilotKit runtimeUrl="/api/copilotkit">
-                {children}
-            </CopilotKit>
+            {children}
         </CopilotContext.Provider>
     )
 }

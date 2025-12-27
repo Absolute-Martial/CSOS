@@ -13,6 +13,9 @@ import ScheduleInput from '@/components/ScheduleInput'
 import LabReportTracker from '@/components/LabReportTracker'
 import StudyAnalytics from '@/components/StudyAnalytics'
 import GoalTracker from '@/components/GoalTracker'
+import FocusScore from '@/components/FocusScore'
+import PomodoroTimer from '@/components/PomodoroTimer'
+import SpacedRepetitionScheduler from '@/components/SpacedRepetitionScheduler'
 
 type TabType = 'today' | 'timeline' | 'tasks' | 'labs' | 'analytics' | 'goals' | 'ai-scheduler' | 'settings'
 
@@ -184,8 +187,20 @@ export default function Home() {
                         {renderTabContent()}
                     </div>
 
-                    {/* Right: AI Command Center */}
-                    <div className="lg:col-span-1">
+                    {/* Right: Sidebar with Focus Score, Pomodoro, and AI */}
+                    <div className="lg:col-span-1 space-y-6">
+                        {/* Focus Score - shown on Today tab */}
+                        {activeTab === 'today' && <FocusScore />}
+
+                        {/* Pomodoro Timer - shown on Today and Timeline tabs */}
+                        {(activeTab === 'today' || activeTab === 'timeline') && (
+                            <PomodoroTimer />
+                        )}
+
+                        {/* Spaced Repetition - shown on Today tab */}
+                        {activeTab === 'today' && <SpacedRepetitionScheduler />}
+
+                        {/* AI Command Center */}
                         <AICommandCenter />
                     </div>
                 </div>
